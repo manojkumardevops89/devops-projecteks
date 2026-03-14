@@ -1,9 +1,9 @@
 replicaCount: 2
 
 image:
-  repository: user-service
-  tag: latest
-  pullPolicy: IfNotPresent
+  repository: 400516512948.dkr.ecr.us-east-1.amazonaws.com/microservices
+  tag: "19"
+  pullPolicy: Always
 
 service:
   type: ClusterIP
