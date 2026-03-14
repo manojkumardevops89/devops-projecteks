@@ -1,0 +1,124 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
+        AWS_CREDENTIALS      = credentials('aws-eks-credentials')
+        EKS_CLUSTER_NAME     = 'lms-devops-dev-eks'
+        AWS_REGION           = 'us-east-1'
+        DOCKERHUB_NAMESPACE  = 'your-dockerhub-username'
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 30, unit: 'MINUTES')
+        timestamps()
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build & Push Docker Images') {
+            parallel {
+                stage('API Gateway') {
+                    steps {
+                        dir('devops-project/microservices/api-gateway') {
+                            script {
+                                def imageTag = "${env.DOCKERHUB_NAMESPACE}/api-gateway:${env.BUILD_NUMBER}"
+                                docker.build(imageTag, '.')
+                                docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
+                                    docker.image(imageTag).push()
+                                    docker.image("${imageTag}").push('latest')
+                                }
+                            }
+                        }
+                    }
+                }
+                stage('User Service') {
+                    steps {
+                        dir('devops-project/microservices/user-service') {
+                            script {
+                                def imageTag = "${env.DOCKERHUB_NAMESPACE}/user-service:${env.BUILD_NUMBER}"
+                                docker.build(imageTag, '.')
+                                docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
+                                    docker.image(imageTag).push()
+                                    docker.image("${imageTag}").push('latest')
+                                }
+                            }
+                        }
+                    }
+                }
+                stage('Product Service') {
+                    steps {
+                        dir('devops-project/microservices/product-service') {
+                            script {
+                                def imageTag = "${env.DOCKERHUB_NAMESPACE}/product-service:${env.BUILD_NUMBER}"
+                                docker.build(imageTag, '.')
+                                docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
+                                    docker.image(imageTag).push()
+                                    docker.image("${imageTag}").push('latest')
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Configure kubectl for EKS') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-eks-credentials']]) {
+                    sh """
+                        aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to EKS with Helm') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-eks-credentials']]) {
+                    dir('devops-project') {
+                        sh """
+                            helm upgrade --install api-gateway helm/api-gateway \\
+                                --set image.repository=${DOCKERHUB_NAMESPACE}/api-gateway \\
+                                --set image.tag=${env.BUILD_NUMBER} \\
+                                --set image.pullPolicy=Always \\
+                                --wait --timeout 5m
+                        """
+                        sh """
+                            helm upgrade --install user-service helm/user-service \\
+                                --set image.repository=${DOCKERHUB_NAMESPACE}/user-service \\
+                                --set image.tag=${env.BUILD_NUMBER} \\
+                                --set image.pullPolicy=Always \\
+                                --wait --timeout 5m
+                        """
+                        sh """
+                            helm upgrade --install product-service helm/product-service \\
+                                --set image.repository=${DOCKERHUB_NAMESPACE}/product-service \\
+                                --set image.tag=${env.BUILD_NUMBER} \\
+                                --set image.pullPolicy=Always \\
+                                --wait --timeout 5m
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline completed successfully. Services deployed to EKS.'
+        }
+        failure {
+            echo 'Pipeline failed. Check logs.'
+        }
+        always {
+            cleanWs(deleteDirs: true, patterns: [[pattern: '*.pyc', type: 'INCLUDE']])
+        }
+    }
+}

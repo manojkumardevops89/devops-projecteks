@@ -1,0 +1,30 @@
+replicaCount: 2
+
+image:
+  repository: api-gateway
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+config:
+  APP_NAME: api-gateway
+  ENV: dev
+  PORT: "8080"
+  LOG_LEVEL: info
+
+secret:
+  # Override in production or via --set
+  API_KEY: change-me-in-production
+  INTERNAL_TOKEN: internal-secret-token
+
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "50m"
+  limits:
+    memory: "128Mi"
+    cpu: "200m"

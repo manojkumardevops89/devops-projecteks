@@ -1,0 +1,30 @@
+replicaCount: 2
+
+image:
+  repository: product-service
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+config:
+  APP_NAME: product-service
+  ENV: dev
+  PORT: "8080"
+  LOG_LEVEL: info
+  CACHE_TTL: "300"
+
+secret:
+  API_KEY: product-api-key
+  CACHE_SECRET: cache-secret
+
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "50m"
+  limits:
+    memory: "128Mi"
+    cpu: "200m"

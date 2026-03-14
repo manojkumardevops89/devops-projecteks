@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-service-config
+  labels:
+    app: user-service
+data:
+  APP_NAME: "user-service"
+  ENV: "dev"
+  PORT: "8080"
+  LOG_LEVEL: "info"
+  DB_HOST: "user-db.example.svc.cluster.local"

@@ -1,0 +1,30 @@
+replicaCount: 2
+
+image:
+  repository: user-service
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+config:
+  APP_NAME: user-service
+  ENV: dev
+  PORT: "8080"
+  LOG_LEVEL: info
+  DB_HOST: user-db.example.svc.cluster.local
+
+secret:
+  DB_PASSWORD: change-me
+  JWT_SECRET: jwt-secret-key
+
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "50m"
+  limits:
+    memory: "128Mi"
+    cpu: "200m"

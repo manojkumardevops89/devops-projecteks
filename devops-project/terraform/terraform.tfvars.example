@@ -1,0 +1,24 @@
+# Copy to terraform.tfvars and adjust
+
+aws_region   = "us-east-1"
+project_name = "lms-devops"
+environment  = "dev"
+
+# VPC
+vpc_cidr                 = "10.0.0.0/16"
+availability_zones_count = 2
+
+# EKS
+eks_cluster_version     = "1.28"
+node_group_instance_types = ["t3.medium"]
+node_group_desired_size = 2
+node_group_min_size     = 1
+node_group_max_size     = 4
+
+# Route53 (optional)
+create_route53_zone = false
+domain_name        = "app.example.com"
+# route53_zone_id  = "Z0123456789ABCDEF"  # Use existing zone
+# After ALB is created by Ingress:
+# alb_dns_name = "k8s-xxxxx.us-east-1.elb.amazonaws.com"
+# alb_zone_id  = "Z35SXDOTRQ7X7K"
