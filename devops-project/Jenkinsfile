@@ -1,99 +1,132 @@
 pipeline {
-    agent any
+agent any
 
-    environment {
-        AWS_REGION = "us-east-1"
-        ECR_REPO = "microservices"
+```
+environment {
+    AWS_REGION = "us-east-1"
+    ECR_REPO = "microservices"
+}
+
+stages {
+
+    stage('Checkout') {
+        steps {
+            checkout scm
+        }
     }
 
-    stages {
-
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage('Get AWS Account ID') {
-            steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-credentials'
-                ]]) {
-                    script {
-                        ACCOUNT_ID = sh(
-                            script: "aws sts get-caller-identity --query Account --output text",
-                            returnStdout: true
-                        ).trim()
-                    }
-                }
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                sh "docker build -t ${ECR_REPO}:${BUILD_NUMBER} ."
-            }
-        }
-
-        stage('Login to ECR') {
-            steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-credentials'
-                ]]) {
-
-                    sh """
-                    aws ecr get-login-password --region ${AWS_REGION} | \
-                    docker login --username AWS \
-                    --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-                    """
-                }
-            }
-        }
-
-        stage('Tag Image') {
-            steps {
-                sh """
-                docker tag ${ECR_REPO}:${BUILD_NUMBER} \
-                ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${BUILD_NUMBER}
-                """
-            }
-        }
-
-        stage('Push Image') {
-            steps {
-                sh """
-                docker push \
-                ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${BUILD_NUMBER}
-                """
-            }
-        }
-
-        stage('Terraform Init') {
-            steps {
-                dir('terraform') {
-                    sh "terraform init"
-                }
-            }
-        }
-
-        stage('Terraform Plan') {
-            steps {
-                dir('terraform') {
-                    sh "terraform plan"
-                }
-            }
-        }
-
-        stage('Terraform Apply') {
-            steps {
-                input message: "Deploy to ECS?", ok: "Deploy"
-
-                dir('terraform') {
-                    sh "terraform apply -auto-approve"
+    stage('Get AWS Account ID') {
+        steps {
+            withCredentials([[
+                $class: 'AmazonWebServicesCredentialsBinding',
+                credentialsId: 'aws-credentials'
+            ]]) {
+                script {
+                    ACCOUNT_ID = sh(
+                        script: "aws sts get-caller-identity --query Account --output text",
+                        returnStdout: true
+                    ).trim()
                 }
             }
         }
     }
+
+    stage('Build Docker Image') {
+        steps {
+            sh "docker build -t ${ECR_REPO}:${BUILD_NUMBER} ."
+        }
+    }
+
+    stage('Login to ECR') {
+        steps {
+            withCredentials([[
+                $class: 'AmazonWebServicesCredentialsBinding',
+                credentialsId: 'aws-credentials'
+            ]]) {
+
+                sh """
+                aws ecr get-login-password --region ${AWS_REGION} | \
+                docker login --username AWS \
+                --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                """
+            }
+        }
+    }
+
+    stage('Tag Image') {
+        steps {
+            sh """
+            docker tag ${ECR_REPO}:${BUILD_NUMBER} \
+            ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${BUILD_NUMBER}
+            """
+        }
+    }
+
+    stage('Push Image') {
+        steps {
+            sh """
+            docker push \
+            ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${BUILD_NUMBER}
+            """
+        }
+    }
+
+    stage('Terraform Init') {
+        steps {
+            dir('terraform') {
+                sh "terraform init"
+            }
+        }
+    }
+
+    stage('Terraform Plan') {
+        steps {
+            dir('terraform') {
+                sh "terraform plan"
+            }
+        }
+    }
+
+    stage('Terraform Apply') {
+        steps {
+            input message: "Deploy Infrastructure?", ok: "Deploy"
+
+            dir('terraform') {
+                sh "terraform apply -auto-approve"
+            }
+        }
+    }
+
+    stage('Update Kubeconfig') {
+        steps {
+            sh """
+            aws eks update-kubeconfig \
+            --region ${AWS_REGION} \
+            --name lms-devops-dev-eks
+            """
+        }
+    }
+
+    stage('Deploy Helm Charts') {
+        steps {
+            sh """
+            cd devops-project/helm
+
+            helm upgrade --install api-gateway ./api_gateway
+            helm upgrade --install user-service ./user-service
+            helm upgrade --install product-service ./product-service
+            """
+        }
+    }
+
+    stage('Apply Ingress') {
+        steps {
+            sh """
+            kubectl apply -f devops-project/kubernetes/ingress.yaml
+            """
+        }
+    }
+}
+```
+
 }
