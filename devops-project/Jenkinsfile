@@ -2,123 +2,98 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        AWS_CREDENTIALS      = credentials('aws-eks-credentials')
-        EKS_CLUSTER_NAME     = 'lms-devops-dev-eks'
-        AWS_REGION           = 'us-east-1'
-        DOCKERHUB_NAMESPACE  = 'your-dockerhub-username'
-    }
-
-    options {
-        buildDiscarder(logRotator(numToKeepStr: '10'))
-        timeout(time: 30, unit: 'MINUTES')
-        timestamps()
+        AWS_REGION = "us-east-1"
+        ECR_REPO = "devops-app"
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Build & Push Docker Images') {
-            parallel {
-                stage('API Gateway') {
-                    steps {
-                        dir('devops-project/microservices/api-gateway') {
-                            script {
-                                def imageTag = "${env.DOCKERHUB_NAMESPACE}/api-gateway:${env.BUILD_NUMBER}"
-                                docker.build(imageTag, '.')
-                                docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
-                                    docker.image(imageTag).push()
-                                    docker.image("${imageTag}").push('latest')
-                                }
-                            }
-                        }
-                    }
-                }
-                stage('User Service') {
-                    steps {
-                        dir('devops-project/microservices/user-service') {
-                            script {
-                                def imageTag = "${env.DOCKERHUB_NAMESPACE}/user-service:${env.BUILD_NUMBER}"
-                                docker.build(imageTag, '.')
-                                docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
-                                    docker.image(imageTag).push()
-                                    docker.image("${imageTag}").push('latest')
-                                }
-                            }
-                        }
-                    }
-                }
-                stage('Product Service') {
-                    steps {
-                        dir('devops-project/microservices/product-service') {
-                            script {
-                                def imageTag = "${env.DOCKERHUB_NAMESPACE}/product-service:${env.BUILD_NUMBER}"
-                                docker.build(imageTag, '.')
-                                docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
-                                    docker.image(imageTag).push()
-                                    docker.image("${imageTag}").push('latest')
-                                }
-                            }
-                        }
+        stage('Get AWS Account ID') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-credentials'
+                ]]) {
+                    script {
+                        ACCOUNT_ID = sh(
+                            script: "aws sts get-caller-identity --query Account --output text",
+                            returnStdout: true
+                        ).trim()
                     }
                 }
             }
         }
 
-        stage('Configure kubectl for EKS') {
+        stage('Build Docker Image') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-eks-credentials']]) {
+                sh "docker build -t ${ECR_REPO}:${BUILD_NUMBER} ."
+            }
+        }
+
+        stage('Login to ECR') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-credentials'
+                ]]) {
+
                     sh """
-                        aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
+                    aws ecr get-login-password --region ${AWS_REGION} | \
+                    docker login --username AWS \
+                    --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
                     """
                 }
             }
         }
 
-        stage('Deploy to EKS with Helm') {
+        stage('Tag Image') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-eks-credentials']]) {
-                    dir('devops-project') {
-                        sh """
-                            helm upgrade --install api-gateway helm/api-gateway \\
-                                --set image.repository=${DOCKERHUB_NAMESPACE}/api-gateway \\
-                                --set image.tag=${env.BUILD_NUMBER} \\
-                                --set image.pullPolicy=Always \\
-                                --wait --timeout 5m
-                        """
-                        sh """
-                            helm upgrade --install user-service helm/user-service \\
-                                --set image.repository=${DOCKERHUB_NAMESPACE}/user-service \\
-                                --set image.tag=${env.BUILD_NUMBER} \\
-                                --set image.pullPolicy=Always \\
-                                --wait --timeout 5m
-                        """
-                        sh """
-                            helm upgrade --install product-service helm/product-service \\
-                                --set image.repository=${DOCKERHUB_NAMESPACE}/product-service \\
-                                --set image.tag=${env.BUILD_NUMBER} \\
-                                --set image.pullPolicy=Always \\
-                                --wait --timeout 5m
-                        """
-                    }
+                sh """
+                docker tag ${ECR_REPO}:${BUILD_NUMBER} \
+                ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${BUILD_NUMBER}
+                """
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                sh """
+                docker push \
+                ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${BUILD_NUMBER}
+                """
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                dir('terraform') {
+                    sh "terraform init"
                 }
             }
         }
-    }
 
-    post {
-        success {
-            echo 'Pipeline completed successfully. Services deployed to EKS.'
+        stage('Terraform Plan') {
+            steps {
+                dir('terraform') {
+                    sh "terraform plan"
+                }
+            }
         }
-        failure {
-            echo 'Pipeline failed. Check logs.'
-        }
-        always {
-            cleanWs(deleteDirs: true, patterns: [[pattern: '*.pyc', type: 'INCLUDE']])
+
+        stage('Terraform Apply') {
+            steps {
+                input message: "Deploy to ECS?", ok: "Deploy"
+
+                dir('terraform') {
+                    sh "terraform apply -auto-approve"
+                }
+            }
         }
     }
 }
