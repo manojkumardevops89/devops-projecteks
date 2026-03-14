@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         AWS_REGION = "us-east-1"
-        ECR_REPO = "devops-app"
+        ECR_REPO = "microservices"
     }
 
     stages {
