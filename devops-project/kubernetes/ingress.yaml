@@ -1,5 +1,3 @@
-# Ingress with AWS ALB - requires AWS Load Balancer Controller installed on EKS
-# Install: https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.4/deploy/install/
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -9,12 +7,9 @@ metadata:
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
     alb.ingress.kubernetes.io/healthcheck-path: /
-    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
-    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
-    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
-    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/group.name: devops-project
 spec:
   ingressClassName: alb
   rules:
@@ -27,6 +22,7 @@ spec:
                 name: api-gateway
                 port:
                   number: 80
+
           - path: /users
             pathType: Prefix
             backend:
@@ -34,6 +30,7 @@ spec:
                 name: user-service
                 port:
                   number: 80
+
           - path: /products
             pathType: Prefix
             backend:
@@ -41,6 +38,7 @@ spec:
                 name: product-service
                 port:
                   number: 80
+
           - path: /
             pathType: Prefix
             backend:
