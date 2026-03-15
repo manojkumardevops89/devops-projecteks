@@ -16,9 +16,12 @@ node_group_min_size     = 1
 node_group_max_size     = 4
 
 # Route53 (optional)
+domain_name = "manojdevops897.shop"
+
 create_route53_zone = false
-domain_name        = "app.example.com"
-# route53_zone_id  = "Z0123456789ABCDEF"  # Use existing zone
-# After ALB is created by Ingress:
-# alb_dns_name = "k8s-xxxxx.us-east-1.elb.amazonaws.com"
-# alb_zone_id  = "Z35SXDOTRQ7X7K"
+
+route53_zone_id = "Z02341861LTO0U4VXW9AM"
+
+alb_dns_name = "k8s-default-appingre-1da6cfeba9-815304968.us-east-1.elb.amazonaws.com"
+
+alb_zone_id = "Z35SXDOTRQ7X7K"
