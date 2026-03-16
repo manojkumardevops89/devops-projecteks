@@ -1,25 +1,24 @@
 """User Service - minimal Python HTTP server for EKS demo."""
-import os
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import json
+# user_service/app.py
+from flask import Flask, jsonify
 
-PORT = int(os.environ.get("PORT", "8080"))
-APP_NAME = os.environ.get("APP_NAME", "user-service")
-ENV = os.environ.get("ENV", "dev")
+app = Flask(__name__)
 
-class Handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(json.dumps({
-            "service": APP_NAME,
-            "env": ENV,
-            "path": self.path,
-            "message": "User service is running"
-        }).encode())
+users = [
+    {"id": 1, "name": "Manoj", "email": "manoj@test.com"},
+    {"id": 2, "name": "DevOps User", "email": "devops@test.com"}
+]
+
+@app.route("/users")
+def get_users():
+    return jsonify(users)
+
+@app.route("/users/<int:uid>")
+def get_user(uid):
+    user = next((u for u in users if u["id"] == uid), None)
+    if user:
+        return jsonify(user)
+    return jsonify({"error": "User not found"}), 404
 
 if __name__ == "__main__":
-    server = HTTPServer(("", PORT), Handler)
-    print(f"Serving {APP_NAME} on port {PORT}")
-    server.serve_forever()
+    app.run(host="0.0.0.0", port=8080)
