@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>EKS Microservices Demo</title>
+  <style>
+    body { font-family: Arial; padding: 30px; background: #f0f4f8; }
+    h1   { color: #1a1a2e; }
+    .btn { background: #1F5C99; color: white; border: none; padding: 10px 24px;
+           margin: 8px; border-radius: 6px; cursor: pointer; font-size: 15px; }
+    .btn:hover { background: #2E74B5; }
+    pre  { background: white; padding: 20px; border-radius: 8px;
+           border: 1px solid #ddd; font-size: 14px; min-height: 100px; }
+    .badge { display:inline-block; background:#1D9E75; color:white;
+             padding:4px 12px; border-radius:20px; font-size:13px; margin-bottom:20px; }
+  </style>
+</head>
+<body>
+  <h1>EKS Microservices Demo</h1>
+  <span class="badge">Live on manojdevops897.shop</span>
+  <br><br>
+  <button class="btn" onclick="getData('/products')">Get Products</button>
+  <button class="btn" onclick="getData('/users')">Get Users</button>
+  <button class="btn" onclick="getData('/')">Gateway Health</button>
+  <pre id="output">Click a button to fetch data...</pre>
+  <script>
+    function getData(path) {
+      document.getElementById('output').innerText = 'Loading...';
+      fetch(path)
+        .then(r => r.json())
+        .then(d => document.getElementById('output').innerText = JSON.stringify(d, null, 2))
+        .catch(e => document.getElementById('output').innerText = 'Error: ' + e);
+    }
+  </script>
+</body>
+</html>
+

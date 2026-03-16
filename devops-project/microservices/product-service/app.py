@@ -1,14 +1,16 @@
 """Product Service - minimal Python HTTP server for EKS demo."""
-# product_service/app.py
 from flask import Flask, jsonify
-
 app = Flask(__name__)
 
 products = [
-    {"id": 1, "name": "Laptop", "price": 800},
-    {"id": 2, "name": "Mobile", "price": 400},
-    {"id": 3, "name": "Headphones", "price": 100}
+    {"id": 1, "name": "Laptop",      "price": 800},
+    {"id": 2, "name": "Mobile",      "price": 400},
+    {"id": 3, "name": "Headphones",  "price": 100}
 ]
+
+@app.route("/")
+def health():
+    return jsonify({"service": "product-service", "status": "running"})
 
 @app.route("/products")
 def get_products():

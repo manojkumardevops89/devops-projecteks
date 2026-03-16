@@ -1,25 +1,29 @@
 """API Gateway - minimal Python HTTP server for EKS demo."""
-# api_gateway/app.py
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 import requests
 
 app = Flask(__name__)
-
 PRODUCT_SERVICE = "http://product-service:80"
 USER_SERVICE = "http://user-service:80"
+
+HTML = open("index.html").read()
 
 @app.route("/")
 def home():
     return jsonify({"service": "api-gateway", "status": "running"})
 
+@app.route("/ui")
+def ui():
+    return HTML
+
 @app.route("/products")
 def products():
-    r = requests.get(f"{PRODUCT_SERVICE}/products")
+    r = requests.get(PRODUCT_SERVICE + "/products")
     return jsonify(r.json())
 
 @app.route("/users")
 def users():
-    r = requests.get(f"{USER_SERVICE}/users")
+    r = requests.get(USER_SERVICE + "/users")
     return jsonify(r.json())
 
 if __name__ == "__main__":

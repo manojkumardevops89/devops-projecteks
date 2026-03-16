@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: 400516512948.dkr.ecr.us-east-1.amazonaws.com/microservices
-  tag: "19"
+  tag: "30"
   pullPolicy: Always
 
 service:
@@ -28,3 +28,9 @@ resources:
   limits:
     memory: "128Mi"
     cpu: "200m"
+
+livenessProbe:
+  path: /products
+
+readinessProbe:
+  path: /products
