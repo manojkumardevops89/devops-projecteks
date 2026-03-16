@@ -1,25 +1,25 @@
 """Product Service - minimal Python HTTP server for EKS demo."""
-import os
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import json
+# product_service/app.py
+from flask import Flask, jsonify
 
-PORT = int(os.environ.get("PORT", "8080"))
-APP_NAME = os.environ.get("APP_NAME", "product-service")
-ENV = os.environ.get("ENV", "dev")
+app = Flask(__name__)
 
-class Handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(json.dumps({
-            "service": APP_NAME,
-            "env": ENV,
-            "path": self.path,
-            "message": "Product service is running"
-        }).encode())
+products = [
+    {"id": 1, "name": "Laptop", "price": 800},
+    {"id": 2, "name": "Mobile", "price": 400},
+    {"id": 3, "name": "Headphones", "price": 100}
+]
+
+@app.route("/products")
+def get_products():
+    return jsonify(products)
+
+@app.route("/products/<int:pid>")
+def get_product(pid):
+    product = next((p for p in products if p["id"] == pid), None)
+    if product:
+        return jsonify(product)
+    return jsonify({"error": "Product not found"}), 404
 
 if __name__ == "__main__":
-    server = HTTPServer(("", PORT), Handler)
-    print(f"Serving {APP_NAME} on port {PORT}")
-    server.serve_forever()
+    app.run(host="0.0.0.0", port=8080)
